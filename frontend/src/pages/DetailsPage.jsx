@@ -1,45 +1,99 @@
-﻿import { useParams, useNavigate } from 'react-router-dom';
-import { useObjects } from '../hooks/useObjects';
-import { useArchitects } from '../hooks/useArchitects';
-import { useMosaics } from '../hooks/useMosaics';
-import { API_URL } from '../api/client';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { API_URL, apiGet } from '../api/client';
 import ArticleBlocks from '../components/ArticleBlocks';
 
 const TYPE_CONFIG = {
   object: {
-    itemsKey: 'objects',
     title: 'Объект не найден',
     hasMap: true,
   },
   architect: {
-    itemsKey: 'architects',
     title: 'Архитектор не найден',
     hasMap: false,
   },
   mosaic: {
-    itemsKey: 'mosaics',
     title: 'Мозаика не найдена',
     hasMap: true,
   },
 };
 
+const TYPE_ENDPOINTS = {
+  object: '/api/objects',
+  architect: '/api/architects',
+  mosaic: '/api/mosaics',
+};
+
 export default function DetailsPage({ type }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { objects } = useObjects();
-  const { architects } = useArchitects();
-  const { mosaics } = useMosaics();
 
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.object;
-  const itemsMap = { objects, architects, mosaics };
-  const items = itemsMap[config.itemsKey] || [];
+  const endpoint = TYPE_ENDPOINTS[type] || TYPE_ENDPOINTS.object;
 
-  const item = items.find((i) => String(i.id) === String(id));
+  const [item, setItem] = useState(null);
+  const [recommended, setRecommended] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadDetails = async () => {
+      setLoading(true);
+      setError('');
+      setItem(null);
+      setRecommended([]);
+
+      try {
+        const data = await apiGet(`${endpoint}/${id}`);
+        if (!isActive) return;
+        setItem(data);
+
+        const recData = await apiGet(`${endpoint}?limit=3&excludeId=${id}&sample=1`);
+        if (!isActive) return;
+        setRecommended(recData || []);
+      } catch (err) {
+        if (!isActive) return;
+        setError(err.message || 'Ошибка загрузки');
+      } finally {
+        if (isActive) setLoading(false);
+      }
+    };
+
+    loadDetails();
+
+    return () => {
+      isActive = false;
+    };
+  }, [endpoint, id]);
+
+  if (loading) {
+    return (
+      <main className="details-page details-skeleton">
+        <section className="details-hero">
+          <div className="details-hero-media skeleton-block details-hero-skeleton" />
+        </section>
+        <section className="details-info">
+          <div className="details-col">
+            <div className="skeleton-line skeleton-line--title" />
+            <div className="details-meta">
+              <div className="skeleton-line skeleton-line--meta" />
+              <div className="skeleton-line skeleton-line--meta" />
+              <div className="skeleton-line skeleton-line--meta" />
+            </div>
+            <div className="skeleton-line skeleton-line--body" />
+            <div className="skeleton-line skeleton-line--body" />
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (!item) {
     return (
       <div className="container" style={{ padding: '40px 0' }}>
-        <p>{config.title}. Проверьте ссылку или вернитесь в список.</p>
+        <p>{error || `${config.title}. Проверьте ссылку или вернитесь в список.`}</p>
       </div>
     );
   }
@@ -49,11 +103,6 @@ export default function DetailsPage({ type }) {
       ? item.image
       : `${API_URL}${item.image}`
     : null;
-
-  const recommended = items
-    .filter((i) => i.id !== item.id)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, 3);
 
   const handleAddressClick = () => {
     if (type === 'object' || type === 'mosaic') {

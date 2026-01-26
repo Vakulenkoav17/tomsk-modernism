@@ -1,11 +1,17 @@
 import { useObjects } from '../hooks/useObjects';
 import Gallery from '../components/Gallery';
-import Banner from '../components/Banner';
+import LoadingGallery from '../components/LoadingGallery';
 
 export default function ObjectsPage() {
   const { objects, loading } = useObjects();
 
-  if (loading) return <div className="container" style={{padding: '40px 0'}}>Загрузка...</div>;
+  if (loading) {
+    return (
+      <div className="container">
+        <LoadingGallery title="ОБЪЕКТЫ" />
+      </div>
+    );
+  }
 
   return (
     <>

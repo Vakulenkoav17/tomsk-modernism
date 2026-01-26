@@ -8,6 +8,7 @@ import ObjectsSection from '../components/admin/ObjectsSection';
 import ArchitectsSection from '../components/admin/ArchitectsSection';
 import MosaicsSection from '../components/admin/MosaicsSection';
 import { API_URL } from '../api/client';
+import { toast } from 'react-hot-toast';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('objects');
@@ -57,6 +58,9 @@ export default function AdminPage() {
   const [objAddressSelected, setObjAddressSelected] = useState(false);
   const [mosaicAddressSelected, setMosaicAddressSelected] = useState(false);
   const [archPreviewUrl, setArchPreviewUrl] = useState('');
+  const [objSubmitting, setObjSubmitting] = useState(false);
+  const [mosaicSubmitting, setMosaicSubmitting] = useState(false);
+  const [archSubmitting, setArchSubmitting] = useState(false);
   const objFormRef = useRef(null);
   const mosaicFormRef = useRef(null);
   const archFormRef = useRef(null);
@@ -201,15 +205,18 @@ export default function AdminPage() {
 
   const handleAddOrUpdateObject = async (e) => {
     e.preventDefault();
+    if (objSubmitting) return;
     if (!isObjReady) {
-      alert('Пожалуйста, выберите адрес и завершите обвод.');
+      toast.error('Пожалуйста, выберите адрес и завершите обвод.');
       return;
     }
 
     try {
+      setObjSubmitting(true);
       const coords = objForm.lat && objForm.lng ? [objForm.lat, objForm.lng] : null;
       if (!coords && objForm.polygonCoords.length === 0) {
-        alert('Сначала задайте контур здания.');
+        toast.error('Сначала задайте контур здания.');
+        setObjSubmitting(false);
         return;
       }
 
@@ -237,10 +244,10 @@ export default function AdminPage() {
 
       if (objForm.mode === 'edit' && objForm.id) {
         await updateObject(objForm.id, formData);
-        alert('Объект обновлен.');
+        toast.success('Объект обновлен.');
       } else {
         await addObject(formData);
-        alert('Объект добавлен.');
+        toast.success('Объект добавлен.');
       }
 
       setObjForm({
@@ -260,18 +267,22 @@ export default function AdminPage() {
       setObjAddressSelected(false);
       objAddress.setOpen(false);
     } catch (err) {
-      alert('Ошибка: ' + err.message);
+      toast.error(`Ошибка: ${err.message}`);
+    } finally {
+      setObjSubmitting(false);
     }
   };
 
   const handleAddOrUpdateMosaic = async (e) => {
     e.preventDefault();
+    if (mosaicSubmitting) return;
     if (!isMosaicReady) {
-      alert('Пожалуйста, выберите адрес и завершите обвод.');
+      toast.error('Пожалуйста, выберите адрес и завершите обвод.');
       return;
     }
 
     try {
+      setMosaicSubmitting(true);
       const formData = new FormData();
       formData.append('name', mosaicForm.name);
       formData.append('author', mosaicForm.author);
@@ -293,10 +304,10 @@ export default function AdminPage() {
 
       if (mosaicForm.mode === 'edit' && mosaicForm.id) {
         await updateMosaic(mosaicForm.id, formData);
-        alert('Мозаика обновлена.');
+        toast.success('Мозаика обновлена.');
       } else {
         await addMosaic(formData);
-        alert('Мозаика добавлена.');
+        toast.success('Мозаика добавлена.');
       }
 
       setMosaicForm({
@@ -316,13 +327,17 @@ export default function AdminPage() {
       setMosaicAddressSelected(false);
       mosaicAddress.setOpen(false);
     } catch (err) {
-      alert('Ошибка: ' + err.message);
+      toast.error(`Ошибка: ${err.message}`);
+    } finally {
+      setMosaicSubmitting(false);
     }
   };
 
   const handleAddOrUpdateArchitect = async (e) => {
     e.preventDefault();
+    if (archSubmitting) return;
     try {
+      setArchSubmitting(true);
       const formData = new FormData();
       formData.append('name', archForm.name);
       formData.append('years', archForm.years);
@@ -333,16 +348,18 @@ export default function AdminPage() {
 
       if (archForm.mode === 'edit' && archForm.id) {
         await updateArchitect(archForm.id, formData);
-        alert('Архитектор обновлен.');
+        toast.success('Архитектор обновлен.');
       } else {
         await addArchitect(formData);
-        alert('Архитектор добавлен.');
+        toast.success('Архитектор добавлен.');
       }
 
       setArchForm({ id: null, mode: 'create', name: '', years: '', bio: '', image: null, articleBlocks: [] });
       setArchPreviewUrl('');
     } catch (err) {
-      alert('Ошибка: ' + err.message);
+      toast.error(`Ошибка: ${err.message}`);
+    } finally {
+      setArchSubmitting(false);
     }
   };
 
@@ -483,6 +500,7 @@ export default function AdminPage() {
                 objAddressOpen={objAddress.open}
                 objAddressLoading={objAddressLoading}
                 isObjReady={isObjReady}
+                isSubmitting={objSubmitting}
                 objects={objects}
                 articleBlocks={objForm.articleBlocks}
                 onArticleChange={(next) => setObjForm((prev) => ({ ...prev, articleBlocks: next }))}
@@ -507,6 +525,7 @@ export default function AdminPage() {
                 rootRef={archFormRef}
                 archForm={archForm}
                 architects={architects}
+                isSubmitting={archSubmitting}
                 articleBlocks={archForm.articleBlocks}
                 onArticleChange={(next) => setArchForm((prev) => ({ ...prev, articleBlocks: next }))}
                 onArchInputChange={handleArchInputChange}
@@ -526,6 +545,7 @@ export default function AdminPage() {
                 mosaicAddressOpen={mosaicAddress.open}
                 mosaicAddressLoading={mosaicAddressLoading}
                 isMosaicReady={isMosaicReady}
+                isSubmitting={mosaicSubmitting}
                 mosaics={mosaics}
                 articleBlocks={mosaicForm.articleBlocks}
                 onArticleChange={(next) => setMosaicForm((prev) => ({ ...prev, articleBlocks: next }))}

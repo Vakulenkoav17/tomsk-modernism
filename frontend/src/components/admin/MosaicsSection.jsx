@@ -11,6 +11,7 @@ export default function MosaicsSection({
   mosaicAddressOpen,
   mosaicAddressLoading,
   isMosaicReady,
+  isSubmitting,
   mosaics,
   articleBlocks,
   onArticleChange,
@@ -112,11 +113,15 @@ export default function MosaicsSection({
         />
 
         <div className="admin-actions">
-          <button type="submit" className="btn btn-primary" disabled={!isMosaicReady}>
-            {mosaicForm.mode === 'edit' ? 'Сохранить изменения' : 'Добавить мозаику'}
+          <button type="submit" className="btn btn-primary" disabled={!isMosaicReady || isSubmitting}>
+            {isSubmitting
+              ? 'Сохранение...'
+              : mosaicForm.mode === 'edit'
+                ? 'Сохранить изменения'
+                : 'Добавить мозаику'}
           </button>
           {mosaicForm.mode === 'edit' && (
-            <button type="button" className="btn btn-secondary" onClick={onCancelEdit}>
+            <button type="button" className="btn btn-secondary" onClick={onCancelEdit} disabled={isSubmitting}>
               Отмена
             </button>
           )}

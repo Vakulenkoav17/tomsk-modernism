@@ -10,6 +10,7 @@ import DetailsPage from './pages/DetailsPage';
 import MapPage from './pages/MapPage';
 import AboutPage from './pages/AboutPage';
 import AdminPage from './pages/AdminPage';
+import { Toaster } from 'react-hot-toast';
 
 import './styles/global.css';
 import './styles/components.css';
@@ -34,6 +35,16 @@ function App() {
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </main>
+      <Toaster
+        position="top-center"
+        gutter={12}
+        toastOptions={{
+          duration: 2000,
+          className: 'toast toast--info',
+          success: { className: 'toast toast--success' },
+          error: { className: 'toast toast--error' },
+        }}
+      />
       <Footer />
     </Router>
   );

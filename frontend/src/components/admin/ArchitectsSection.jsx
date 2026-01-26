@@ -6,6 +6,7 @@ export default function ArchitectsSection({
   rootRef,
   archForm,
   architects,
+  isSubmitting,
   articleBlocks,
   onArticleChange,
   onArchInputChange,
@@ -66,11 +67,15 @@ export default function ArchitectsSection({
         />
 
         <div className="admin-actions">
-          <button type="submit" className="btn btn-primary">
-            {archForm.mode === 'edit' ? 'Сохранить изменения' : 'Добавить архитектора'}
+          <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
+            {isSubmitting
+              ? 'Сохранение...'
+              : archForm.mode === 'edit'
+                ? 'Сохранить изменения'
+                : 'Добавить архитектора'}
           </button>
           {archForm.mode === 'edit' && (
-            <button type="button" className="btn btn-secondary" onClick={onCancelEdit}>
+            <button type="button" className="btn btn-secondary" onClick={onCancelEdit} disabled={isSubmitting}>
               Отмена
             </button>
           )}

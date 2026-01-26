@@ -11,6 +11,7 @@ export default function ObjectsSection({
   objAddressOpen,
   objAddressLoading,
   isObjReady,
+  isSubmitting,
   objects,
   articleBlocks,
   onArticleChange,
@@ -112,11 +113,15 @@ export default function ObjectsSection({
         />
 
         <div className="admin-actions">
-          <button type="submit" className="btn btn-primary" disabled={!isObjReady}>
-            {objForm.mode === 'edit' ? 'Сохранить изменения' : 'Добавить объект'}
+          <button type="submit" className="btn btn-primary" disabled={!isObjReady || isSubmitting}>
+            {isSubmitting
+              ? 'Сохранение...'
+              : objForm.mode === 'edit'
+                ? 'Сохранить изменения'
+                : 'Добавить объект'}
           </button>
           {objForm.mode === 'edit' && (
-            <button type="button" className="btn btn-secondary" onClick={onCancelEdit}>
+            <button type="button" className="btn btn-secondary" onClick={onCancelEdit} disabled={isSubmitting}>
               Отмена
             </button>
           )}
