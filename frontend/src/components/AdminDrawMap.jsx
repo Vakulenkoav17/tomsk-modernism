@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef } from 'react';
+﻿import { useCallback, useEffect, useRef } from 'react';
 import { YMaps, Map, Polygon } from '@pbe/react-yandex-maps';
 
 const YANDEX_API_KEY = import.meta.env.VITE_YANDEX_MAPS_API_KEY;
@@ -18,6 +18,7 @@ export default function AdminDrawMap({
   const polygonRef = useRef(null);
   const lastAddressRef = useRef('');
   const lastGeometryRef = useRef('');
+  const originalGeometryRef = useRef('');
 
   useEffect(() => {
     if (mapRef.current && center && center[0] && center[1]) {
@@ -33,7 +34,7 @@ export default function AdminDrawMap({
     }
   }, [polygonCoords]);
 
-  const normalizePolygon = (geojson) => {
+  const normalizePolygon = useCallback((geojson) => {
     if (!geojson) return null;
     if (geojson.type === 'Polygon' && geojson.coordinates?.length) {
       return geojson.coordinates[0].map(([lng, lat]) => [lat, lng]);
@@ -42,9 +43,9 @@ export default function AdminDrawMap({
       return geojson.coordinates[0][0].map(([lng, lat]) => [lat, lng]);
     }
     return null;
-  };
+  }, []);
 
-  const fetchBuildingOutline = async (lat, lng) => {
+  const fetchBuildingOutline = useCallback(async (lat, lng) => {
     const overpassQuery = `[out:json];way["building"](around:40,${lat},${lng});out geom;`;
     const response = await fetch('https://overpass-api.de/api/interpreter', {
       method: 'POST',
@@ -59,9 +60,9 @@ export default function AdminDrawMap({
       .sort((a, b) => b.geometry.length - a.geometry.length)[0];
     if (!best || !best.geometry) return null;
     return best.geometry.map((point) => [point.lat, point.lon]);
-  };
+  }, []);
 
-  const resolveAddress = async (rawAddress) => {
+  const resolveAddress = useCallback(async (rawAddress) => {
     const query = rawAddress.includes('Tomsk') ? rawAddress : `${rawAddress}, Tomsk`;
     const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&polygon_geojson=1&q=${encodeURIComponent(query)}`;
     const response = await fetch(url, {
@@ -78,7 +79,7 @@ export default function AdminDrawMap({
       polygon = await fetchBuildingOutline(lat, lng);
     }
     return { lat, lng, polygonCoords: polygon };
-  };
+  }, [fetchBuildingOutline, normalizePolygon]);
 
   useEffect(() => {
     if (!resolveEnabled) return;
@@ -109,7 +110,7 @@ export default function AdminDrawMap({
     }, 600);
 
     return () => clearTimeout(handle);
-  }, [address, resolveEnabled, onPolygonChange, onResolve, onResolveStart, onResolveEnd]);
+  }, [address, resolveAddress, resolveEnabled, onPolygonChange, onResolve, onResolveStart, onResolveEnd]);
 
   const handleMapClick = (e) => {
     if (!drawModeRef.current) return;
@@ -118,30 +119,35 @@ export default function AdminDrawMap({
     onPolygonChange(next);
   };
 
-  const handleStartDraw = () => {
-    drawModeRef.current = true;
-    onPolygonChange([]);
-  };
-
-  const handleStopDraw = () => {
-    drawModeRef.current = false;
-  };
-
-  const handleClear = () => {
-    drawModeRef.current = false;
-    onPolygonChange([]);
-  };
-
   const handleEditStart = () => {
+    if (Array.isArray(polygonCoords) && polygonCoords.length >= 3) {
+      originalGeometryRef.current = JSON.stringify(polygonCoords);
+    } else {
+      originalGeometryRef.current = lastGeometryRef.current || '';
+    }
     if (polygonRef.current?.editor) {
       polygonRef.current.editor.startEditing();
+      drawModeRef.current = false;
+      return;
     }
+    drawModeRef.current = true;
   };
 
   const handleEditStop = () => {
     if (polygonRef.current?.editor) {
       polygonRef.current.editor.stopEditing();
     }
+    drawModeRef.current = false;
+  };
+
+  const handleEditCancel = () => {
+    drawModeRef.current = false;
+    if (polygonRef.current?.editor) {
+      polygonRef.current.editor.stopEditing();
+    }
+    const restoredSource = originalGeometryRef.current || lastGeometryRef.current;
+    const restored = restoredSource ? JSON.parse(restoredSource) : [];
+    onPolygonChange(restored);
   };
 
   const handleGeometryChange = () => {
@@ -161,21 +167,65 @@ export default function AdminDrawMap({
   return (
     <div className="admin-map-wrapper">
       <div className="admin-map-controls">
-        <button type="button" className="btn btn-small" onClick={handleStartDraw}>
-          Начать обвод
-        </button>
-        <button type="button" className="btn btn-small" onClick={handleEditStart}>
-          Редактировать
-        </button>
-        <button type="button" className="btn btn-small" onClick={handleEditStop}>
-          Завершить правку
-        </button>
-        <button type="button" className="btn btn-small" onClick={handleStopDraw}>
-          Завершить обвод
-        </button>
-        <button type="button" className="btn btn-small btn-delete" onClick={handleClear}>
-          Очистить
-        </button>
+        <div className="admin-map-actions">
+          <button
+            type="button"
+            className="btn btn-small btn-icon btn-map"
+            onClick={handleEditStart}
+            aria-label="Редактировать контур"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M4 14.5V16h1.5L15 6.5 13.5 5 4 14.5Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="btn btn-small btn-icon btn-map btn-map-ghost"
+            onClick={handleEditCancel}
+            aria-label="Отменить правку"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M6 8a6 6 0 1 1-1 6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+              <path
+                d="M4.5 6.5h4v4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="btn btn-small btn-icon btn-map btn-map-success"
+            onClick={handleEditStop}
+            aria-label="Завершить правку"
+          >
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M4.5 10.5l3.2 3.2L15.5 6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <YMaps query={{ apikey: YANDEX_API_KEY }}>

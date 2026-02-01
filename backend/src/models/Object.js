@@ -4,7 +4,7 @@ const objectSchema = new mongoose.Schema(
   {
     name: String,
     architect: String,
-    year: Number,
+    year: String,
     address: String,
     desc: String,
     image: String,

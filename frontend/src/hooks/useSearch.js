@@ -1,5 +1,5 @@
 // src/hooks/useSearch.js
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useObjects } from './useObjects';
 import { useArchitects } from './useArchitects';
 import { useMosaics } from './useMosaics';
@@ -10,7 +10,7 @@ export function useSearch() {
   const { architects } = useArchitects();
   const { mosaics } = useMosaics();
 
-  const search = (query) => {
+  const search = useCallback((query) => {
     const q = query.toLowerCase();
     const res = [];
 
@@ -33,9 +33,9 @@ export function useSearch() {
     });
 
     setResults(res);
-  };
+  }, [architects, mosaics, objects]);
 
-  const clearResults = () => setResults([]);
+  const clearResults = useCallback(() => setResults([]), []);
 
   return { results, search, clearResults };
 }

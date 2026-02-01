@@ -7,8 +7,9 @@ import AdminDrawMap from '../components/AdminDrawMap';
 import ObjectsSection from '../components/admin/ObjectsSection';
 import ArchitectsSection from '../components/admin/ArchitectsSection';
 import MosaicsSection from '../components/admin/MosaicsSection';
-import { API_URL } from '../api/client';
+import { apiGet, setAdminAuth, clearAdminAuth, hasAdminAuth, API_URL } from '../api/client';
 import { toast } from 'react-hot-toast';
+import useSmoothScroll from '../hooks/useSmoothScroll';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('objects');
@@ -58,12 +59,25 @@ export default function AdminPage() {
   const [objAddressSelected, setObjAddressSelected] = useState(false);
   const [mosaicAddressSelected, setMosaicAddressSelected] = useState(false);
   const [archPreviewUrl, setArchPreviewUrl] = useState('');
+  const [objPreviewUrl, setObjPreviewUrl] = useState('');
+  const [mosaicPreviewUrl, setMosaicPreviewUrl] = useState('');
   const [objSubmitting, setObjSubmitting] = useState(false);
   const [mosaicSubmitting, setMosaicSubmitting] = useState(false);
   const [archSubmitting, setArchSubmitting] = useState(false);
+  const [authStatus, setAuthStatus] = useState('checking');
+  const [authUser, setAuthUser] = useState('');
+  const [authPass, setAuthPass] = useState('');
+  const [authError, setAuthError] = useState('');
+  const smoothScroll = useSmoothScroll();
   const objFormRef = useRef(null);
   const mosaicFormRef = useRef(null);
   const archFormRef = useRef(null);
+
+  const normalizeAuthValue = (value) =>
+    (value || '')
+      .replace(/\u00a0/g, ' ')
+      .trim()
+      .replace(/^['"]|['"]$/g, '');
 
   const { objects, addObject, updateObject, deleteObject } = useObjects();
   const { architects, addArchitect, updateArchitect, deleteArchitect } = useArchitects();
@@ -180,9 +194,27 @@ export default function AdminPage() {
   const scrollToForm = (ref) => {
     if (!ref?.current) return;
     requestAnimationFrame(() => {
-      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      smoothScroll(ref.current, 120, 500);
     });
   };
+
+  useEffect(() => {
+    const verify = async () => {
+      if (!hasAdminAuth()) {
+        setAuthStatus('required');
+        return;
+      }
+      try {
+        await apiGet('/api/admin/ping', { auth: true });
+        setAuthStatus('ok');
+      } catch {
+        clearAdminAuth();
+        setAuthStatus('required');
+      }
+    };
+
+    verify();
+  }, []);
 
   useEffect(() => {
     if (!archForm.image) {
@@ -203,9 +235,51 @@ export default function AdminPage() {
     return undefined;
   }, [archForm.image]);
 
+  useEffect(() => {
+    if (!objForm.image) {
+      setObjPreviewUrl('');
+      return undefined;
+    }
+
+    if (objForm.image instanceof File) {
+      const previewUrl = URL.createObjectURL(objForm.image);
+      setObjPreviewUrl(previewUrl);
+      return () => URL.revokeObjectURL(previewUrl);
+    }
+
+    const resolved = objForm.image.startsWith('http')
+      ? objForm.image
+      : `${API_URL}${objForm.image}`;
+    setObjPreviewUrl(resolved);
+    return undefined;
+  }, [objForm.image]);
+
+  useEffect(() => {
+    if (!mosaicForm.image) {
+      setMosaicPreviewUrl('');
+      return undefined;
+    }
+
+    if (mosaicForm.image instanceof File) {
+      const previewUrl = URL.createObjectURL(mosaicForm.image);
+      setMosaicPreviewUrl(previewUrl);
+      return () => URL.revokeObjectURL(previewUrl);
+    }
+
+    const resolved = mosaicForm.image.startsWith('http')
+      ? mosaicForm.image
+      : `${API_URL}${mosaicForm.image}`;
+    setMosaicPreviewUrl(resolved);
+    return undefined;
+  }, [mosaicForm.image]);
+
   const handleAddOrUpdateObject = async (e) => {
     e.preventDefault();
     if (objSubmitting) return;
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
     if (!isObjReady) {
       toast.error('Пожалуйста, выберите адрес и завершите обвод.');
       return;
@@ -276,6 +350,10 @@ export default function AdminPage() {
   const handleAddOrUpdateMosaic = async (e) => {
     e.preventDefault();
     if (mosaicSubmitting) return;
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
     if (!isMosaicReady) {
       toast.error('Пожалуйста, выберите адрес и завершите обвод.');
       return;
@@ -336,6 +414,10 @@ export default function AdminPage() {
   const handleAddOrUpdateArchitect = async (e) => {
     e.preventDefault();
     if (archSubmitting) return;
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
     try {
       setArchSubmitting(true);
       const formData = new FormData();
@@ -364,6 +446,10 @@ export default function AdminPage() {
   };
 
   const startEditObject = (obj) => {
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
     setActiveTab('objects');
     setObjAddressSelected(true);
     objAddress.setOpen(false);
@@ -375,7 +461,7 @@ export default function AdminPage() {
       architect: obj.architect || '',
       year: obj.year || '',
       desc: obj.desc || '',
-      image: null,
+      image: obj.image || null,
       articleBlocks: obj.articleBlocks || [],
       lat: obj.lat || '',
       lng: obj.lng || '',
@@ -401,9 +487,26 @@ export default function AdminPage() {
       lng: '',
       polygonCoords: [],
     });
+    setObjPreviewUrl('');
+  };
+
+  const clearObjectCardData = () => {
+    setObjForm((prev) => ({
+      ...prev,
+      name: '',
+      architect: '',
+      year: '',
+      desc: '',
+      image: null,
+    }));
+    setObjPreviewUrl('');
   };
 
   const startEditMosaic = (mosaic) => {
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
     setActiveTab('mosaics');
     setMosaicAddressSelected(true);
     mosaicAddress.setOpen(false);
@@ -415,7 +518,7 @@ export default function AdminPage() {
       year: mosaic.year || '',
       location: mosaic.location || '',
       desc: mosaic.desc || '',
-      image: null,
+      image: mosaic.image || null,
       articleBlocks: mosaic.articleBlocks || [],
       lat: mosaic.lat || '',
       lng: mosaic.lng || '',
@@ -441,9 +544,26 @@ export default function AdminPage() {
       lng: '',
       polygonCoords: [],
     });
+    setMosaicPreviewUrl('');
+  };
+
+  const clearMosaicCardData = () => {
+    setMosaicForm((prev) => ({
+      ...prev,
+      name: '',
+      author: '',
+      year: '',
+      desc: '',
+      image: null,
+    }));
+    setMosaicPreviewUrl('');
   };
 
   const startEditArchitect = (arch) => {
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
     setActiveTab('architects');
     setArchForm({
       id: arch.id,
@@ -451,16 +571,115 @@ export default function AdminPage() {
       name: arch.name || '',
       years: arch.years || '',
       bio: arch.bio || '',
-      image: null,
+      image: arch.image || null,
       articleBlocks: arch.articleBlocks || [],
     });
     scrollToForm(archFormRef);
+  };
+
+  const handleDeleteObject = async (id) => {
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
+    try {
+      await deleteObject(id);
+      toast.success('Объект удален.');
+    } catch (err) {
+      toast.error(`Ошибка: ${err.message}`);
+    }
+  };
+
+  const handleDeleteMosaic = async (id) => {
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
+    try {
+      await deleteMosaic(id);
+      toast.success('Мозаика удалена.');
+    } catch (err) {
+      toast.error(`Ошибка: ${err.message}`);
+    }
+  };
+
+  const handleDeleteArchitect = async (id) => {
+    if (authStatus !== 'ok') {
+      toast.error('Требуется авторизация администратора.');
+      return;
+    }
+    try {
+      await deleteArchitect(id);
+      toast.success('Архитектор удален.');
+    } catch (err) {
+      toast.error(`Ошибка: ${err.message}`);
+    }
   };
 
   const cancelEditArchitect = () => {
     setArchForm({ id: null, mode: 'create', name: '', years: '', bio: '', image: null, articleBlocks: [] });
     setArchPreviewUrl('');
   };
+
+  if (authStatus !== 'ok') {
+    return (
+      <main className="admin-page">
+        <div className="container admin-container">
+          <div className="admin-panel admin-auth">
+            <h2 className="admin-title">Вход в админку</h2>
+            <p className="admin-auth-note">
+              Введите логин и пароль администратора. Данные хранятся только в этой сессии.
+            </p>
+            <form
+              className="admin-auth-form"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setAuthError('');
+                setAuthStatus('checking');
+                try {
+                  const cleanUser = normalizeAuthValue(authUser);
+                  const cleanPass = normalizeAuthValue(authPass);
+                  setAdminAuth(cleanUser, cleanPass);
+                  await apiGet('/api/admin/ping', { auth: true });
+                  setAuthStatus('ok');
+                  toast.success('Авторизация успешна.');
+                } catch {
+                  clearAdminAuth();
+                  setAuthError('Неверный логин или пароль.');
+                  setAuthStatus('required');
+                }
+              }}
+            >
+              <div className="form-group">
+                <label className="form-label">Логин</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  value={authUser}
+                  onChange={(event) => setAuthUser(event.target.value)}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Пароль</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={authPass}
+                  onChange={(event) => setAuthPass(event.target.value)}
+                  required
+                />
+              </div>
+              {authError && <div className="admin-auth-error">{authError}</div>}
+              <button type="submit" className="btn btn-primary">
+                Войти
+              </button>
+            </form>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="admin-page">
@@ -503,6 +722,7 @@ export default function AdminPage() {
                 isSubmitting={objSubmitting}
                 objects={objects}
                 articleBlocks={objForm.articleBlocks}
+                previewUrl={objPreviewUrl}
                 onArticleChange={(next) => setObjForm((prev) => ({ ...prev, articleBlocks: next }))}
                 onFieldChange={handleObjFieldChange}
                 onAddressChange={objAddress.handleInputChange}
@@ -516,8 +736,9 @@ export default function AdminPage() {
                 onAddressBlur={objAddress.handleBlur}
                 onSubmit={handleAddOrUpdateObject}
                 onCancelEdit={cancelEditObject}
+                onClearCardData={clearObjectCardData}
                 onEditObject={startEditObject}
-                onDeleteObject={deleteObject}
+                onDeleteObject={handleDeleteObject}
               />
 
               <ArchitectsSection
@@ -533,7 +754,7 @@ export default function AdminPage() {
                 onSubmit={handleAddOrUpdateArchitect}
                 onCancelEdit={cancelEditArchitect}
                 onEditArchitect={startEditArchitect}
-                onDeleteArchitect={deleteArchitect}
+                onDeleteArchitect={handleDeleteArchitect}
               />
 
               <MosaicsSection
@@ -548,6 +769,7 @@ export default function AdminPage() {
                 isSubmitting={mosaicSubmitting}
                 mosaics={mosaics}
                 articleBlocks={mosaicForm.articleBlocks}
+                previewUrl={mosaicPreviewUrl}
                 onArticleChange={(next) => setMosaicForm((prev) => ({ ...prev, articleBlocks: next }))}
                 onFieldChange={handleMosaicFieldChange}
                 onAddressChange={mosaicAddress.handleInputChange}
@@ -561,8 +783,9 @@ export default function AdminPage() {
                 onAddressBlur={mosaicAddress.handleBlur}
                 onSubmit={handleAddOrUpdateMosaic}
                 onCancelEdit={cancelEditMosaic}
+                onClearCardData={clearMosaicCardData}
                 onEditMosaic={startEditMosaic}
-                onDeleteMosaic={deleteMosaic}
+                onDeleteMosaic={handleDeleteMosaic}
               />
             </div>
 

@@ -20,13 +20,13 @@ const stripStreetType = (value) => {
       ''
     )
     .replace(/\s+/g, ' ')
-    .replace(/^[,.\s]+|[,\.\s]+$/g, '')
+    .replace(/^[,.\s]+|[,.\s]+$/g, '')
     .trim();
 };
 
 const splitAddressQuery = (value) => {
   const trimmed = (value || '').trim();
-  const match = trimmed.match(/^(.*?)(\d[\d\/\-\u0430-\u044f\u0410-\u042f]*)\s*$/);
+  const match = trimmed.match(/^(.*?)(\d[\d/\-\u0430-\u044f\u0410-\u042f]*)\s*$/);
   if (match) {
     return {
       streetRaw: match[1].replace(/[,]+$/g, '').trim(),

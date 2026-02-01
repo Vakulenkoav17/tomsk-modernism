@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
+import ScrollToTopButton from './components/ScrollToTopButton';
 import HomePage from './pages/HomePage';
 import ObjectsPage from './pages/ObjectsPage';
 import ArchitectsPage from './pages/ArchitectsPage';
@@ -35,6 +36,7 @@ function App() {
           <Route path="/admin" element={<AdminPage />} />
         </Routes>
       </main>
+      <ScrollToTopButton />
       <Toaster
         position="top-center"
         gutter={12}

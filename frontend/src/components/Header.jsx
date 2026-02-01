@@ -1,16 +1,30 @@
-﻿import { useEffect, useState } from 'react';
+﻿import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import Navigation from './Navigation';
 import SearchModal from './SearchModal';
 
 export default function Header() {
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [menuState, setMenuState] = useState(() => ({
+    open: false,
+    path: location.pathname,
+  }));
+  const isMenuOpen = menuState.open && menuState.path === location.pathname;
 
-  useEffect(() => {
-    setMenuOpen(false);
-  }, [location.pathname]);
+  const closeMenu = () => {
+    setMenuState({ open: false, path: location.pathname });
+  };
+
+  const toggleMenu = () => {
+    setMenuState((prev) => {
+      const samePath = prev.path === location.pathname;
+      return {
+        open: samePath ? !prev.open : true,
+        path: location.pathname,
+      };
+    });
+  };
 
   return (
     <>
@@ -19,8 +33,8 @@ export default function Header() {
           <Link className="logo logo-link" to="/" aria-label="На главную">
             ТОМСК МОДЕРНИЗМ
           </Link>
-          <div className={`nav-links-wrapper ${menuOpen ? 'open' : ''}`}>
-            <Navigation onNavigate={() => setMenuOpen(false)} />
+          <div className={`nav-links-wrapper ${isMenuOpen ? 'open' : ''}`}>
+            <Navigation onNavigate={closeMenu} />
           </div>
           <div className="nav-actions">
             <button
@@ -43,8 +57,8 @@ export default function Header() {
             </button>
             <button
               className="menu-btn"
-              onClick={() => setMenuOpen((prev) => !prev)}
-              aria-expanded={menuOpen}
+              onClick={toggleMenu}
+              aria-expanded={isMenuOpen}
               aria-label="Открыть меню"
               type="button"
             >

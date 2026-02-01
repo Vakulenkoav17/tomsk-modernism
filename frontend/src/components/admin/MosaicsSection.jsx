@@ -14,6 +14,7 @@ export default function MosaicsSection({
   isSubmitting,
   mosaics,
   articleBlocks,
+  previewUrl,
   onArticleChange,
   onFieldChange,
   onAddressChange,
@@ -25,6 +26,7 @@ export default function MosaicsSection({
   onAddressBlur,
   onSubmit,
   onCancelEdit,
+  onClearCardData,
   onEditMosaic,
   onDeleteMosaic,
 }) {
@@ -103,7 +105,22 @@ export default function MosaicsSection({
           <div className="form-group">
             <label className="form-label">Фото</label>
             <input type="file" className="form-input" accept="image/*" onChange={onImageChange} />
+            {previewUrl && (
+              <div className="card-image-preview">
+                <img src={previewUrl} alt="Превью" />
+              </div>
+            )}
           </div>
+          {mosaicForm.mode === 'edit' && (
+            <div className="card-form-actions">
+              <button type="submit" className="btn btn-primary btn-small" disabled={isSubmitting}>
+                Сохранить
+              </button>
+              <button type="button" className="btn btn-secondary btn-small" onClick={onClearCardData} disabled={isSubmitting}>
+                Очистить
+              </button>
+            </div>
+          )}
         </div>
 
         <ArticleEditor
@@ -137,10 +154,29 @@ export default function MosaicsSection({
               <div className="item-desc">{mosaic.location}</div>
             </div>
             <div className="item-actions">
-              <button className="btn btn-small" onClick={() => onEditMosaic(mosaic)}>
+              <button className="btn btn-small btn-icon" onClick={() => onEditMosaic(mosaic)}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M4 14.5V16h1.5L15 6.5 13.5 5 4 14.5Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                </svg>
                 Редактировать
               </button>
-              <button className="btn btn-small btn-delete" onClick={() => onDeleteMosaic(mosaic.id)}>
+              <button className="btn btn-small btn-danger-outline btn-icon" onClick={() => onDeleteMosaic(mosaic.id)}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M5 6.5h10M8 6.5v8M12 6.5v8M7.5 6.5l1-2h3l1 2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
                 Удалить
               </button>
             </div>
