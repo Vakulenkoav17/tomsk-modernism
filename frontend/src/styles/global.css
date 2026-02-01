@@ -5,7 +5,7 @@
   }
   
   body {
-    font-family: 'Georgia', serif;
+  font-family: 'Montserrat', sans-serif;
     color: var(--color-text);
     background-color: var(--color-bg);
     line-height: 1.6;

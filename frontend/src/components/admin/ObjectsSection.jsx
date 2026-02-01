@@ -14,6 +14,7 @@ export default function ObjectsSection({
   isSubmitting,
   objects,
   articleBlocks,
+  previewUrl,
   onArticleChange,
   onFieldChange,
   onAddressChange,
@@ -25,6 +26,7 @@ export default function ObjectsSection({
   onAddressBlur,
   onSubmit,
   onCancelEdit,
+  onClearCardData,
   onEditObject,
   onDeleteObject,
 }) {
@@ -103,7 +105,22 @@ export default function ObjectsSection({
           <div className="form-group">
             <label className="form-label">Фото</label>
             <input type="file" className="form-input" accept="image/*" onChange={onImageChange} />
+            {previewUrl && (
+              <div className="card-image-preview">
+                <img src={previewUrl} alt="Превью" />
+              </div>
+            )}
           </div>
+          {objForm.mode === 'edit' && (
+            <div className="card-form-actions">
+              <button type="submit" className="btn btn-primary btn-small" disabled={isSubmitting}>
+                Сохранить
+              </button>
+              <button type="button" className="btn btn-secondary btn-small" onClick={onClearCardData} disabled={isSubmitting}>
+                Очистить
+              </button>
+            </div>
+          )}
         </div>
 
         <ArticleEditor
@@ -139,10 +156,29 @@ export default function ObjectsSection({
               </div>
             </div>
             <div className="item-actions">
-              <button className="btn btn-small" onClick={() => onEditObject(obj)}>
+              <button className="btn btn-small btn-icon" onClick={() => onEditObject(obj)}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M4 14.5V16h1.5L15 6.5 13.5 5 4 14.5Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                </svg>
                 Редактировать
               </button>
-              <button className="btn btn-small btn-delete" onClick={() => onDeleteObject(obj.id)}>
+              <button className="btn btn-small btn-danger-outline btn-icon" onClick={() => onDeleteObject(obj.id)}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M5 6.5h10M8 6.5v8M12 6.5v8M7.5 6.5l1-2h3l1 2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
                 Удалить
               </button>
             </div>

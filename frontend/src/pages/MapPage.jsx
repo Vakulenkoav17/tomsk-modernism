@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import useContainerSize from '../hooks/useContainerSize';
+import { buildOptimizedImageUrl } from '../utils/cloudinary';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { YMaps, Map, Polygon } from '@pbe/react-yandex-maps';
 import { useObjects } from '../hooks/useObjects';
@@ -7,12 +9,31 @@ import { API_URL } from '../api/client';
 
 const YANDEX_API_KEY = import.meta.env.VITE_YANDEX_MAPS_API_KEY;
 
+const getPolygonCenter = (coords) => {
+  if (!Array.isArray(coords) || coords.length === 0) return null;
+  const sum = coords.reduce(
+    (acc, [lat, lng]) => [acc[0] + lat, acc[1] + lng],
+    [0, 0]
+  );
+  return [sum[0] / coords.length, sum[1] / coords.length];
+};
+
+const getMobilePanOffset = () => {
+  if (typeof window === 'undefined') return 0;
+  if (window.innerWidth > 480) return 0;
+  const rawOffset = Math.round(window.innerHeight * 0.28);
+  return Math.max(110, Math.min(240, rawOffset));
+};
+
 export default function MapPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const mapRef = useRef(null);
-  const [selected, setSelected] = useState(null);
+  const [selectedId, setSelectedId] = useState(null);
+  const [selectedType, setSelectedType] = useState(null);
+  const [loadedImageUrl, setLoadedImageUrl] = useState('');
   const [mapReady, setMapReady] = useState(false);
+  const { ref: mapImageRef, width: mapImageWidth, height: mapImageHeight } = useContainerSize({ step: 100 });
   const { objects } = useObjects();
   const { mosaics } = useMosaics();
 
@@ -26,56 +47,63 @@ export default function MapPage() {
     return [...objItems, ...mosaicItems];
   }, [objects, mosaics]);
 
-  useEffect(() => {
+  const focusFromLocation = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const focusId =
       params.get('focus') || location.state?.focusItemId || location.state?.focusObjectId;
     const focusType = location.state?.focusItemType;
-    if (!focusId || items.length === 0) return;
-    const match = items.find((item) => {
+    if (!focusId || items.length === 0) return null;
+    return items.find((item) => {
       const sameId = String(item.id) === String(focusId);
       if (!sameId) return false;
       if (!focusType) return true;
       return item.type === focusType;
+    }) || null;
+  }, [items, location.search, location.state]);
+
+  const selectedItem = useMemo(() => {
+    if (selectedId && items.length > 0) {
+      return (
+        items.find((item) => {
+          const sameId = String(item.id) === String(selectedId);
+          if (!sameId) return false;
+          if (!selectedType) return true;
+          return item.type === selectedType;
+        }) || null
+      );
+    }
+    return focusFromLocation;
+  }, [focusFromLocation, items, selectedId, selectedType]);
+
+  const focusMap = useCallback((center, zoom) => {
+    if (!mapRef.current || !center) return;
+    const map = mapRef.current;
+    const offset = getMobilePanOffset();
+    const targetZoom = zoom ?? map.getZoom?.();
+    let targetCenter = center;
+    if (offset && map.options?.get && targetZoom !== undefined) {
+      const projection = map.options.get('projection');
+      if (projection?.toGlobalPixels && projection?.fromGlobalPixels) {
+        const global = projection.toGlobalPixels(center, targetZoom);
+        const shifted = [global[0], global[1] + offset];
+        targetCenter = projection.fromGlobalPixels(shifted, targetZoom);
+      }
+    }
+    map.setCenter(targetCenter, targetZoom, {
+      duration: 450,
+      checkZoomRange: true,
     });
-    if (match) setSelected(match);
-  }, [location.search, location.state, items]);
+  }, []);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selectedItem) return;
     if (!mapReady) return;
     const center =
-      selected.lat && selected.lng
-        ? [Number(selected.lat), Number(selected.lng)]
-        : getPolygonCenter(selected.polygonCoords);
-    if (mapRef.current && center) {
-      mapRef.current.setCenter(center, 16, {
-        duration: 500,
-        checkZoomRange: true,
-      });
-    }
-  }, [mapReady, selected]);
-
-  const getPolygonCenter = (coords) => {
-    if (!Array.isArray(coords) || coords.length === 0) return null;
-    const sum = coords.reduce(
-      (acc, [lat, lng]) => [acc[0] + lat, acc[1] + lng],
-      [0, 0]
-    );
-    return [sum[0] / coords.length, sum[1] / coords.length];
-  };
-
-  const handlePolygonClick = (item) => {
-    if (!item.hasCard) return;
-    setSelected(item);
-    const center = item.lat && item.lng ? [item.lat, item.lng] : getPolygonCenter(item.polygonCoords);
-    if (mapRef.current && center) {
-      mapRef.current.setCenter(center, 16, {
-        duration: 500,
-        checkZoomRange: true,
-      });
-    }
-  };
+      selectedItem.lat && selectedItem.lng
+        ? [Number(selectedItem.lat), Number(selectedItem.lng)]
+        : getPolygonCenter(selectedItem.polygonCoords);
+    focusMap(center, 16);
+  }, [focusMap, mapReady, selectedItem]);
 
   const getStrokeColor = (item) => {
     if (item.hasCard) return '#ff6b35';
@@ -104,11 +132,50 @@ export default function MapPage() {
     return `/objects/${item.id}`;
   };
 
-  const imageUrl = selected?.image
-    ? selected.image.startsWith('http')
-      ? selected.image
-      : `${API_URL}${selected.image}`
+  const imageUrl = selectedItem?.image
+    ? selectedItem.image.startsWith('http')
+      ? selectedItem.image
+      : `${API_URL}${selectedItem.image}`
     : null;
+
+  const imageLoading = Boolean(imageUrl && loadedImageUrl !== imageUrl);
+
+  const handleImageLoaded = () => {
+    if (imageUrl) setLoadedImageUrl(imageUrl);
+  };
+
+  const focusParam = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get('focus');
+  }, [location.search]);
+
+  const hasLocationFocus = Boolean(
+    focusParam || location.state?.focusItemId || location.state?.focusObjectId
+  );
+
+  const clearLocationFocus = () => {
+    const params = new URLSearchParams(location.search);
+    params.delete('focus');
+    const nextSearch = params.toString();
+    navigate(nextSearch ? `/map?${nextSearch}` : '/map', { replace: true, state: null });
+  };
+
+  const handleClosePanel = () => {
+    setSelectedId(null);
+    setSelectedType(null);
+    if (hasLocationFocus) {
+      clearLocationFocus();
+    }
+  };
+
+  const handlePolygonClick = (item) => {
+    if (!item.hasCard) return;
+    setSelectedId(item.id);
+    setSelectedType(item.type);
+    if (hasLocationFocus) {
+      clearLocationFocus();
+    }
+  };
 
   return (
     <>
@@ -149,26 +216,49 @@ export default function MapPage() {
           </YMaps>
         </div>
 
-        {selected && (
+        {selectedItem && (
           <div className="map-object-panel">
             <div className="map-object-card">
-              <button className="map-close-btn" onClick={() => setSelected(null)}>
+              <button className="map-close-btn" onClick={handleClosePanel}>
                 ×
               </button>
-              <div className="map-object-image">
+              <div
+                className={`map-object-image ${imageLoading ? 'skeleton-block' : ''}`}
+                ref={mapImageRef}
+              >
                 {imageUrl ? (
-                  <img src={imageUrl} alt={getTitle(selected)} />
+                  <img
+                    src={buildOptimizedImageUrl(imageUrl, mapImageWidth, mapImageHeight, "fill")}
+                    alt={getTitle(selectedItem)}
+                    loading="lazy"
+                    decoding="async"
+                    className={imageLoading ? 'is-loading' : ''}
+                    onLoad={handleImageLoaded}
+                    onError={handleImageLoaded}
+                  />
                 ) : (
                   <div className="image-placeholder">Нет изображения</div>
                 )}
               </div>
               <div className="map-object-info">
-                <h3>{getTitle(selected)}</h3>
-                {getSubtitle(selected) && <p className="address">{getSubtitle(selected)}</p>}
-                {selected.desc && <p className="desc">{selected.desc}</p>}
-                <button className="btn btn-primary" onClick={() => navigate(getDetailsPath(selected))}>
-                  Подробнее
-                </button>
+                {imageLoading ? (
+                  <div className="map-object-skeleton" aria-hidden="true">
+                    <div className="skeleton-line skeleton-line--title" />
+                    <div className="skeleton-line skeleton-line--meta" />
+                    <div className="skeleton-line skeleton-line--body" />
+                    <div className="skeleton-line skeleton-line--body" />
+                    <div className="skeleton-line map-skeleton-button" />
+                  </div>
+                ) : (
+                  <>
+                    <h3>{getTitle(selectedItem)}</h3>
+                    {getSubtitle(selectedItem) && <p className="address">{getSubtitle(selectedItem)}</p>}
+                    {selectedItem.desc && <p className="desc">{selectedItem.desc}</p>}
+                    <button className="btn btn-primary" onClick={() => navigate(getDetailsPath(selectedItem))}>
+                      Подробнее
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

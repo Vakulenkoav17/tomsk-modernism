@@ -4,7 +4,7 @@ const mosaicSchema = new mongoose.Schema(
   {
     name: String,
     author: String,
-    year: Number,
+    year: String,
     location: String,
     desc: String,
     image: String,

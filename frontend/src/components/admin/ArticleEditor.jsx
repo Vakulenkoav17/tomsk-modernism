@@ -1,26 +1,65 @@
-import { useState } from 'react';
-import { API_URL } from '../../api/client';
+import { useEffect, useRef, useState } from 'react';
+import { toast } from 'react-hot-toast';
+import { API_URL, apiForm } from '../../api/client';
+import useSmoothScroll from '../../hooks/useSmoothScroll';
 
 const MAX_IMAGES = 5;
 
 export default function ArticleEditor({ value, onChange, type }) {
   const [uploadingId, setUploadingId] = useState(null);
+  const [scrollToken, setScrollToken] = useState(0);
   const blocks = Array.isArray(value) ? value : [];
+  const editorRef = useRef(null);
+  const pendingScrollRef = useRef(null);
+  const smoothScroll = useSmoothScroll();
 
   const updateBlocks = (next) => {
     if (onChange) onChange(next);
   };
 
   const handleAddBlock = () => {
-    updateBlocks([...blocks, { id: Date.now(), text: '', images: [] }]);
+    const nextId = Date.now();
+    updateBlocks([...blocks, { id: nextId, text: '', images: [], caption: '' }]);
+    pendingScrollRef.current = { type: 'add', id: nextId };
+    setScrollToken(Date.now());
   };
 
   const handleRemoveBlock = (id) => {
+    const currentIndex = blocks.findIndex((block) => block.id === id);
+    const prevBlock = currentIndex > 0 ? blocks[currentIndex - 1] : null;
+    pendingScrollRef.current = { type: 'remove', id: prevBlock ? prevBlock.id : null };
+    setScrollToken(Date.now());
     updateBlocks(blocks.filter((block) => block.id !== id));
   };
 
+  useEffect(() => {
+    const pending = pendingScrollRef.current;
+    if (!pending) return;
+    pendingScrollRef.current = null;
+    const scrollToTarget = () => {
+      if (pending.type === 'add' && pending.id) {
+        const target = document.querySelector(`[data-block-id="${pending.id}"]`);
+        if (target) smoothScroll(target, 120, 600);
+        return;
+      }
+      if (pending.type === 'remove') {
+        if (pending.id) {
+          const target = document.querySelector(`[data-block-id="${pending.id}"]`);
+          if (target) smoothScroll(target, 120, 500);
+          return;
+        }
+        if (editorRef.current) smoothScroll(editorRef.current, 120, 500);
+      }
+    };
+    requestAnimationFrame(scrollToTarget);
+  }, [scrollToken, blocks.length, smoothScroll]);
+
   const handleTextChange = (id, text) => {
     updateBlocks(blocks.map((block) => (block.id === id ? { ...block, text } : block)));
+  };
+
+  const handleCaptionChange = (id, caption) => {
+    updateBlocks(blocks.map((block) => (block.id === id ? { ...block, caption } : block)));
   };
 
   const handleRemoveImage = (id, index) => {
@@ -46,14 +85,7 @@ export default function ArticleEditor({ value, onChange, type }) {
 
     try {
       setUploadingId(id);
-      const response = await fetch(`${API_URL}/api/uploads`, {
-        method: 'POST',
-        body: formData,
-      });
-      if (!response.ok) {
-        throw new Error('Не удалось загрузить изображения.');
-      }
-      const data = await response.json();
+      const data = await apiForm('/api/uploads', 'POST', formData);
       const newImages = Array.isArray(data.files) ? data.files : [];
       updateBlocks(
         blocks.map((item) => {
@@ -62,7 +94,7 @@ export default function ArticleEditor({ value, onChange, type }) {
         })
       );
     } catch (error) {
-      alert(error.message);
+      toast.error(error.message);
     } finally {
       setUploadingId(null);
     }
@@ -74,25 +106,46 @@ export default function ArticleEditor({ value, onChange, type }) {
   };
 
   return (
-    <div className="article-editor">
+    <div className="article-editor" ref={editorRef}>
       <div className="article-editor-header">
         <h4 className="card-form-title">Статья</h4>
-        <button type="button" className="btn btn-small" onClick={handleAddBlock}>
-          Добавить абзац
-        </button>
+        {blocks.length === 0 && (
+          <button type="button" className="btn btn-small btn-icon" onClick={handleAddBlock}>
+            <svg viewBox="0 0 20 20" aria-hidden="true">
+              <path
+                d="M10 4v12M4 10h12"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+            Добавить статью
+          </button>
+        )}
       </div>
 
       {blocks.length === 0 && <div className="article-empty">Абзацев пока нет.</div>}
 
       {blocks.map((block, index) => (
-        <div key={block.id} className="article-editor-block">
+        <div key={block.id} className="article-editor-block" data-block-id={block.id}>
           <div className="article-editor-top">
             <div className="article-editor-title">Абзац {index + 1}</div>
             <button
               type="button"
-              className="btn btn-small btn-delete"
+              className="btn btn-small btn-danger-outline btn-icon"
               onClick={() => handleRemoveBlock(block.id)}
             >
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path
+                  d="M5 6.5h10M8 6.5v8M12 6.5v8M7.5 6.5l1-2h3l1 2"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
               Удалить
             </button>
           </div>
@@ -136,6 +189,30 @@ export default function ArticleEditor({ value, onChange, type }) {
             value={block.text}
             onChange={(event) => handleTextChange(block.id, event.target.value)}
           />
+          <input
+            type="text"
+            className="form-input"
+            placeholder="О фотографии"
+            value={block.caption || ''}
+            onChange={(event) => handleCaptionChange(block.id, event.target.value)}
+          />
+
+          {index === blocks.length - 1 && (
+            <div className="article-editor-actions">
+              <button type="button" className="btn btn-small btn-icon" onClick={handleAddBlock}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M10 4v12M4 10h12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Добавить абзац
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>

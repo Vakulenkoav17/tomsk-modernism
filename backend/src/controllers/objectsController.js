@@ -21,13 +21,13 @@ const buildObjectPayload = (body, file, { defaults = false } = {}) => {
   const payload = {
     name: body.name,
     architect: body.architect,
-    year: parseNumber(body.year, undefined),
+    year: body.year,
     address: body.address,
     desc: body.desc,
     lat: parseNumber(body.lat, defaults ? 56.4866 : undefined),
     lng: parseNumber(body.lng, defaults ? 84.9719 : undefined),
-    isUnique: parseBoolean(body.isUnique, false),
-    hasCard: parseBoolean(body.hasCard, false),
+    isUnique: parseBoolean(body.isUnique, defaults ? false : undefined),
+    hasCard: parseBoolean(body.hasCard, defaults ? false : undefined),
     polygonCoords: polygon.value ?? (defaults ? [] : undefined),
     articleBlocks: articles.value ?? (defaults ? [] : undefined),
   };
@@ -39,7 +39,7 @@ const listObjects = asyncHandler(async (req, res) => {
   const { limit, excludeId, sample } = req.query;
   const query = {};
   if (excludeId && mongoose.Types.ObjectId.isValid(excludeId)) {
-    query._id = { $ne: excludeId };
+    query._id = { $ne: new mongoose.Types.ObjectId(excludeId) };
   }
 
   const parsedLimit = Number(limit);

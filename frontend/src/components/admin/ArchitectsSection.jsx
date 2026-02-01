@@ -91,10 +91,29 @@ export default function ArchitectsSection({
               <div className="item-desc">{arch.years}</div>
             </div>
             <div className="item-actions">
-              <button className="btn btn-small" onClick={() => onEditArchitect(arch)}>
+              <button className="btn btn-small btn-icon" onClick={() => onEditArchitect(arch)}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M4 14.5V16h1.5L15 6.5 13.5 5 4 14.5Z"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinejoin="round"
+                  />
+                </svg>
                 Редактировать
               </button>
-              <button className="btn btn-small btn-delete" onClick={() => onDeleteArchitect(arch.id)}>
+              <button className="btn btn-small btn-danger-outline btn-icon" onClick={() => onDeleteArchitect(arch.id)}>
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  <path
+                    d="M5 6.5h10M8 6.5v8M12 6.5v8M7.5 6.5l1-2h3l1 2"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
                 Удалить
               </button>
             </div>

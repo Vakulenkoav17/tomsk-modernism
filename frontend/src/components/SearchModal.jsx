@@ -15,7 +15,7 @@ export default function SearchModal({ onClose }) {
       // Если строка пустая или короче 2 символов — очищаем результаты
       clearResults?.();
     }
-  }, [query]);
+  }, [query, search, clearResults]);
 
   const handleClear = () => {
     setQuery('');
@@ -68,8 +68,7 @@ export default function SearchModal({ onClose }) {
                 stroke="currentColor"
                 strokeWidth="2"
               >
-                <rcle cx="11" cy="11" r="7" />
-                <line x1="16" y1="16" x2="21" y2="21" />
+                
               </svg>
             </div>
           )}
@@ -103,6 +102,14 @@ export default function SearchModal({ onClose }) {
               key={i}
               className="search-result-item"
               onClick={() => handleResultClick(res)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  handleResultClick(res);
+                }
+              }}
             >
               <strong>{res.name}</strong><br />
               <small>{res.type}: {res.desc || res.bio || res.location}</small>

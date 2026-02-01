@@ -29,7 +29,7 @@ const listArchitects = asyncHandler(async (req, res) => {
   const { limit, excludeId, sample } = req.query;
   const query = {};
   if (excludeId && mongoose.Types.ObjectId.isValid(excludeId)) {
-    query._id = { $ne: excludeId };
+    query._id = { $ne: new mongoose.Types.ObjectId(excludeId) };
   }
 
   const parsedLimit = Number(limit);

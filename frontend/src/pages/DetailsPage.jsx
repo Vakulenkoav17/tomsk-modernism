@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import useContainerSize from '../hooks/useContainerSize';
+import { buildOptimizedImageUrl, buildBlurredImageUrl } from '../utils/cloudinary';
 import { useParams, useNavigate } from 'react-router-dom';
 import { API_URL, apiGet } from '../api/client';
 import ArticleBlocks from '../components/ArticleBlocks';
@@ -28,6 +30,8 @@ export default function DetailsPage({ type }) {
   const { id } = useParams();
   const navigate = useNavigate();
 
+  const { ref: heroRef, width: heroWidth, height: heroHeight } = useContainerSize({ step: 100 });
+
   const config = TYPE_CONFIG[type] || TYPE_CONFIG.object;
   const endpoint = TYPE_ENDPOINTS[type] || TYPE_ENDPOINTS.object;
 
@@ -52,7 +56,8 @@ export default function DetailsPage({ type }) {
 
         const recData = await apiGet(`${endpoint}?limit=3&excludeId=${id}&sample=1`);
         if (!isActive) return;
-        setRecommended(recData || []);
+        const filtered = (recData || []).filter((rec) => String(rec.id || rec._id) !== String(id));
+        setRecommended(filtered);
       } catch (err) {
         if (!isActive) return;
         setError(err.message || 'Ошибка загрузки');
@@ -102,6 +107,10 @@ export default function DetailsPage({ type }) {
     ? item.image.startsWith('http')
       ? item.image
       : `${API_URL}${item.image}`
+    : null;
+  const dpr = typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+  const heroMainUrl = imageUrl
+    ? buildOptimizedImageUrl(imageUrl, heroWidth, heroHeight, "fit", { quality: 'good', dpr })
     : null;
 
   const handleAddressClick = () => {
@@ -171,12 +180,34 @@ export default function DetailsPage({ type }) {
     return `/objects/${rec.id}`;
   };
 
+  const heroBackdropUrl = imageUrl
+    ? buildBlurredImageUrl(imageUrl, heroWidth, heroHeight)
+    : null;
+
   return (
     <main className="details-page">
       {imageUrl && (
         <section className="details-hero">
-          <div className="details-hero-media">
-            <img src={imageUrl} alt={item.name} />
+          <div className="details-hero-media" ref={heroRef}>
+            {heroBackdropUrl && (
+              <img
+                className="media-backdrop"
+                src={heroBackdropUrl}
+                alt=""
+                aria-hidden="true"
+                loading="lazy"
+                decoding="async"
+              />
+            )}
+            {heroMainUrl && (
+              <img
+                className="media-foreground"
+                src={heroMainUrl}
+                alt={item.name}
+                loading="lazy"
+                decoding="async"
+              />
+            )}
           </div>
         </section>
       )}

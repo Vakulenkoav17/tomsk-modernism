@@ -38,10 +38,13 @@ const extractPublicId = (url) => {
   if (!url || typeof url !== 'string') return null;
   const parts = url.split('/upload/');
   if (parts.length < 2) return null;
-  let tail = parts[1];
-  tail = tail.replace(/^v\d+\//, '');
-  tail = tail.split('?')[0];
-  const withoutExt = tail.replace(/\\.[^/.]+$/, '');
+  let tail = parts[1].split('?')[0];
+  const segments = tail.split('/').filter(Boolean);
+  const versionIndex = segments.findIndex((segment) => /^v\d+$/.test(segment));
+  const relevant = versionIndex >= 0 ? segments.slice(versionIndex + 1) : segments;
+  if (relevant.length === 0) return null;
+  const path = relevant.join('/');
+  const withoutExt = path.replace(/\.[^/.]+$/, '');
   return withoutExt || null;
 };
 
